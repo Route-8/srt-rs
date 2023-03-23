@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use srt_tokio::{SrtSocket};
+use srt_tokio::SrtSocket;
 
 use assert_matches::assert_matches;
 use bytes::Bytes;
