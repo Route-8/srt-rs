@@ -1,4 +1,3 @@
-use core::u32;
 use std::cmp::max;
 use std::time::{Duration, Instant};
 

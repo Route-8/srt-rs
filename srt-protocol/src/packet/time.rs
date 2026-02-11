@@ -5,7 +5,6 @@ use std::{
     num::Wrapping,
     ops::{Add, Div, Mul, Neg, Sub},
     time::{Duration, Instant},
-    u32,
 };
 
 /// Timestamp in us after creation

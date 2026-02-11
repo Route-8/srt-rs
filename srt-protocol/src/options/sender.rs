@@ -66,7 +66,7 @@ pub struct Sender {
     ///
     /// The default flow control window size is 25600 packets. It is approximately:
     /// - 270 Mbits of payload in the default live streaming configuration with an SRT payload size
-    ///     of 1316 bytes;
+    ///   of 1316 bytes;
     /// - 300 Mbits of payload with an SRT payload size of 1456 bytes.
     ///
     /// The minimum number of packets in flight should be (assuming max payload size):
@@ -76,9 +76,9 @@ pub struct Sender {
     /// - MSS - Maximum segment size (aka MTU), see SRTO_MSS;
     /// - 44 - size of headers (20 bytes IPv4 + 8 bytes of UDP + 16 bytes of SRT packet header).
     /// - To avoid blocking the sending of further packets in case of packet loss, the recommended
-    ///     flow control window is
+    ///   flow control window is
     /// - FC = bps / 8 × (RTTsec + latency_sec) / (MSS - 44), where latency_sec is the receiver
-    ///     buffering delay (SRTO_RCVLATENCY) in seconds.
+    ///   buffering delay (SRTO_RCVLATENCY) in seconds.
     pub flow_control_window_size: PacketCount,
 
     /// SRTO_PAYLOADSIZE

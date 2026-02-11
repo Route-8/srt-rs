@@ -129,7 +129,7 @@ type QueryPairs<'a> = (
 );
 
 impl SrtUri {
-    fn parse_query_pairs(url: &Url) -> Result<QueryPairs, SrtUriError> {
+    fn parse_query_pairs(url: &Url) -> Result<QueryPairs<'_>, SrtUriError> {
         use SrtUriError::*;
 
         let mut mode = SrtUrlMode::Unspecified;

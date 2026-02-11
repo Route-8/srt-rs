@@ -209,6 +209,7 @@ pub fn start_hsv5_initiation(
 }
 
 impl StartedInitiator {
+    #[allow(clippy::result_large_err)]
     pub fn finish_hsv5_initiation(
         self,
         response: &HandshakeControlInfo,

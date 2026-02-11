@@ -272,7 +272,7 @@ bitflags! {
 }
 
 fn le_bytes_to_string(le_bytes: &mut impl Buf) -> Result<String, PacketParseError> {
-    if le_bytes.remaining() % 4 != 0 {
+    if !le_bytes.remaining().is_multiple_of(4) {
         return Err(PacketParseError::NotEnoughData);
     }
 
@@ -427,10 +427,10 @@ impl SrtControlPacket {
             KeyRefreshRequest(ref k) | KeyRefreshResponse(ref k) => {
                 4 + k.salt.len() as u16 / 4 + k.wrapped_keys.len() as u16 / 4
             }
-            Congestion(str) | StreamId(str) => ((str.len() + 3) / 4) as u16, // round up to nearest multiple of 4
+            Congestion(str) | StreamId(str) => str.len().div_ceil(4) as u16, // round up to nearest multiple of 4
             // 1 32-bit word packed with type, flags, and weight
             Group { .. } => 1,
-            Filter(filter) => ((format!("{filter}").len() + 3) / 4) as u16, // TODO: not optimial performace, but probably okay
+            Filter(filter) => format!("{filter}").len().div_ceil(4) as u16, // TODO: not optimial performace, but probably okay
             _ => unimplemented!("{:?}", self),
         }
     }

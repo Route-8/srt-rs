@@ -93,14 +93,14 @@ impl AckHistoryWindow {
                 // less than 2 RTTs,
                 interval < rtt_mean * 2
         };
-        if self.buffer.back().map_or(false, is_last_ack_too_recent) {
+        if self.buffer.back().is_some_and(is_last_ack_too_recent) {
             return None;
         }
 
         // drain expired entries from ACK History Window
         let latency_window = self.tsbpd_latency + rtt_mean * 2;
         let has_expired = |ack: &AckHistoryEntry| now > ack.departure_time + latency_window;
-        while self.buffer.len() > 1 && self.buffer.front().map_or(false, has_expired) {
+        while self.buffer.len() > 1 && self.buffer.front().is_some_and(has_expired) {
             let _ = self.buffer.pop_front();
         }
 

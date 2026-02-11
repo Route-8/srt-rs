@@ -1295,7 +1295,7 @@ impl HandshakeControlInfo {
                 +
                 info.ext_km.as_ref().map(|hs| 2 * size_of::<u16>() + usize::from(hs.size_words()) * size_of::<u32>()).unwrap_or(0)
                 +
-                info.sid.as_ref().map(|sid| 2 * size_of::<u16>() + ((sid.len() + 3) / 4 * 4)).unwrap_or(0)
+                info.sid.as_ref().map(|sid| 2 * size_of::<u16>() + (sid.len().div_ceil(4) * 4)).unwrap_or(0)
             }
         }
     }

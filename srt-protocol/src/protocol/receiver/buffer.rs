@@ -67,7 +67,7 @@ impl BufferPacket {
 
     pub fn in_message(&self, message: MsgNumber) -> bool {
         self.data_packet()
-            .map_or(false, |d| d.message_number == message)
+            .is_some_and(|d| d.message_number == message)
     }
 
     pub fn is_first(&self) -> bool {
@@ -479,7 +479,7 @@ impl ReceiveBuffer {
 
         let tsbpd_threshold = now - self.tsbpd_latency - self.tsbpd_tolerance;
         let too_late_packets = data_packets.take_while(|packet| {
-            packet.map_or(true, |(_, packet_time, message_loc)| {
+            packet.is_none_or(|(_, packet_time, message_loc)| {
                 packet_time <= tsbpd_threshold || !message_loc.contains(PacketLocation::FIRST)
             })
         });

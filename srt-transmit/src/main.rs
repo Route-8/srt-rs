@@ -239,7 +239,7 @@ fn parse_socket_options(
     Ok(bind_options)
 }
 
-fn parse_rendezvous(input_url: &Url) -> Option<Cow<str>> {
+fn parse_rendezvous(input_url: &Url) -> Option<Cow<'_, str>> {
     let rendezvous_v =
         input_url
             .query_pairs()

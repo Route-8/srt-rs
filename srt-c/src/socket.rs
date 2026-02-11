@@ -383,13 +383,13 @@ impl SocketData {
                 Ok(size_of::<i64>())
             }
             Str(str) => {
-                if optval_len < (str.as_bytes().len() + 1) {
+                if optval_len < (str.len() + 1) {
                     return Err(SRT_EINVPARAM.into());
                 }
                 let optval = slice::from_raw_parts_mut(optval.cast::<u8>().as_mut(), optval_len);
-                optval[..str.as_bytes().len()].copy_from_slice(str.as_bytes());
-                optval[str.as_bytes().len()] = 0; // null terminator
-                Ok(str.as_bytes().len())
+                optval[..str.len()].copy_from_slice(str.as_bytes());
+                optval[str.len()] = 0; // null terminator
+                Ok(str.len())
             }
         }
     }

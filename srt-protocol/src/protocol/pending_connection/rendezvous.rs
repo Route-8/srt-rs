@@ -91,6 +91,7 @@ enum RendezvousHsV5 {
     Responder,
 }
 
+#[allow(clippy::result_large_err)]
 fn get_handshake(packet: &Packet) -> Result<&HandshakeControlInfo, ConnectError> {
     match packet {
         Packet::Control(ControlPacket {
@@ -104,6 +105,7 @@ fn get_handshake(packet: &Packet) -> Result<&HandshakeControlInfo, ConnectError>
     }
 }
 
+#[allow(clippy::result_large_err)]
 fn extract_ext_info(
     info: &HandshakeControlInfo,
 ) -> Result<Option<&SrtControlPacket>, ConnectError> {

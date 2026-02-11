@@ -36,7 +36,7 @@ impl MultiplexListener {
         }
     }
 
-    pub fn handle_input(&mut self, now: Instant, input: Input) -> Action {
+    pub fn handle_input(&mut self, now: Instant, input: Input) -> Action<'_> {
         match input {
             Input::Packet(packet) => self.handle_input_packet(now, packet),
             Input::AccessResponse(response) => self.handle_input_access_response(now, response),
@@ -46,7 +46,7 @@ impl MultiplexListener {
         }
     }
 
-    fn handle_input_packet(&mut self, now: Instant, packet: ReceivePacketResult) -> Action {
+    fn handle_input_packet(&mut self, now: Instant, packet: ReceivePacketResult) -> Action<'_> {
         match packet {
             Ok(packet) => self.handle_packet(now, packet),
             Err(error) => self.handle_packet_receive_error(now, error),
@@ -57,7 +57,7 @@ impl MultiplexListener {
         &mut self,
         now: Instant,
         response: Option<(SessionId, AccessControlResponse)>,
-    ) -> Action {
+    ) -> Action<'_> {
         match response {
             Some((session_id, response)) => {
                 self.handle_access_control_response(now, session_id, response)
@@ -66,7 +66,7 @@ impl MultiplexListener {
         }
     }
 
-    fn handle_packet(&mut self, now: Instant, packet: (Packet, SocketAddr)) -> Action {
+    fn handle_packet(&mut self, now: Instant, packet: (Packet, SocketAddr)) -> Action<'_> {
         self.stats.rx_packets += 1;
         //self.stats.rx_bytes += packet
         let session_id = SessionId(packet.1);
@@ -77,7 +77,11 @@ impl MultiplexListener {
             .handle_packet(now, session_id, packet)
     }
 
-    fn handle_packet_receive_error(&mut self, now: Instant, error: ReceivePacketError) -> Action {
+    fn handle_packet_receive_error(
+        &mut self,
+        now: Instant,
+        error: ReceivePacketError,
+    ) -> Action<'_> {
         self.warn(now, "packet", &error);
 
         use ReceivePacketError::*;
@@ -94,14 +98,14 @@ impl MultiplexListener {
         now: Instant,
         session_id: SessionId,
         response: AccessControlResponse,
-    ) -> Action {
+    ) -> Action<'_> {
         match self.sessions.get_mut(&session_id) {
             Some(session) => session.handle_access_control_response(now, session_id, response),
             None => Action::DropConnection(session_id),
         }
     }
 
-    fn handle_timer(&mut self, now: Instant) -> Action {
+    fn handle_timer(&mut self, now: Instant) -> Action<'_> {
         if self.stats_timer.check_expired(now).is_some() {
             Action::UpdateStatistics(&self.stats)
         } else {
@@ -111,7 +115,7 @@ impl MultiplexListener {
         }
     }
 
-    fn handle_success(&mut self, _now: Instant, result_of: ResultOf) -> Action {
+    fn handle_success(&mut self, _now: Instant, result_of: ResultOf) -> Action<'_> {
         use ResultOf::*;
         match result_of {
             SendPacket(_) => {
@@ -139,7 +143,7 @@ impl MultiplexListener {
         Action::WaitForInput
     }
 
-    fn handle_failure(&mut self, now: Instant, result_of: ResultOf) -> Action {
+    fn handle_failure(&mut self, now: Instant, result_of: ResultOf) -> Action<'_> {
         self.warn(now, "failure", &result_of);
 
         use ResultOf::*;
@@ -150,7 +154,7 @@ impl MultiplexListener {
         }
     }
 
-    fn handle_close(&mut self) -> Action {
+    fn handle_close(&mut self) -> Action<'_> {
         Action::Close
     }
 

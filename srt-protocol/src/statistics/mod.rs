@@ -83,7 +83,7 @@ pub struct SocketStatistics {
     /// A packet is considered lost in two cases:
     /// 1. Sender receives a loss report (NAK) from a receiver.
     /// 2. Sender initiates retransmission after not receiving an ACK packet for a certain timeout.
-    /// Refer to `FASTREXMIT` and `LATEREXMIT` algorithms.
+    ///    Refer to `FASTREXMIT` and `LATEREXMIT` algorithms.
     pub tx_loss_data: u64, // pktSndLossTotal
 
     /// The total number of SRT DATA packets detected as presently missing (either reordered or lost)

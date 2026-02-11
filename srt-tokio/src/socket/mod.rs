@@ -101,6 +101,7 @@ impl SrtSocket {
         Ok(())
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn split_mut(
         &mut self,
     ) -> (

@@ -251,7 +251,6 @@ pub struct SRT_TRACEBSTATS {
 }
 
 #[repr(C)]
-#[repr(C)]
 pub struct SRT_MSGCTRL {
     /// Left for future
     flags: c_int,

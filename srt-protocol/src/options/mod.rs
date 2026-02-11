@@ -14,6 +14,7 @@ mod socket;
 mod srt_version;
 mod stream_id;
 mod units;
+#[allow(dead_code)]
 mod uri;
 mod validation;
 

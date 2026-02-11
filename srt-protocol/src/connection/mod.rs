@@ -132,7 +132,7 @@ impl DuplexConnection {
         }
     }
 
-    pub fn handle_input(&mut self, now: Instant, input: Input) -> Action {
+    pub fn handle_input(&mut self, now: Instant, input: Input) -> Action<'_> {
         self.debug(now, "input", &input);
 
         match input {
@@ -391,7 +391,7 @@ impl DuplexConnection {
         }
     }
 
-    fn sender(&mut self) -> SenderContext {
+    fn sender(&mut self) -> SenderContext<'_> {
         SenderContext::new(
             &mut self.status,
             &mut self.timers,
@@ -401,7 +401,7 @@ impl DuplexConnection {
         )
     }
 
-    fn receiver(&mut self) -> ReceiverContext {
+    fn receiver(&mut self) -> ReceiverContext<'_> {
         ReceiverContext::new(
             &mut self.timers,
             &mut self.output,

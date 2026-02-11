@@ -10,7 +10,7 @@ use crate::options::{
 #[derive(Debug, Default)]
 pub struct RateEstimate {
     pub mean: u64,
-    pub variance: u64,
+    pub _variance: u64,
 }
 
 #[derive(Debug, Default)]
@@ -47,14 +47,14 @@ impl RateEstimation {
         }
         RateEstimate {
             mean: self.mean as u64,
-            variance: self.variance as u64,
+            _variance: self.variance as u64,
         }
     }
 }
 
 #[derive(Debug, Default)]
 pub struct InputRateEstimate {
-    pub messages: RateEstimate,
+    pub _messages: RateEstimate,
     pub packets: RateEstimate,
     pub bytes: RateEstimate,
 }
@@ -75,7 +75,7 @@ impl InputRateEstimation {
 
     pub fn calculate(&mut self, elapsed: Duration) -> InputRateEstimate {
         InputRateEstimate {
-            messages: self.messages.calculate(elapsed),
+            _messages: self.messages.calculate(elapsed),
             packets: self.packets.calculate(elapsed),
             bytes: self.bytes.calculate(elapsed),
         }
