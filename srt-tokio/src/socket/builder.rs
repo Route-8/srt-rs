@@ -1,14 +1,22 @@
 use std::net::SocketAddr;
-use std::{convert::TryInto, io, net::IpAddr, time::Duration};
+use std::{convert::TryInto, io, net::IpAddr, sync::Arc, time::Duration};
 
 use tokio::net::UdpSocket;
 
-use crate::options::*;
+use crate::{
+    net::{bind_socket, PacketSocket},
+    options::*,
+    PassphraseCallback, PassphraseResult,
+};
 
 use super::SrtSocket;
 
 #[derive(Default)]
-pub struct SrtSocketBuilder(SocketOptions, Option<UdpSocket>);
+pub struct SrtSocketBuilder {
+    options: SocketOptions,
+    socket: Option<UdpSocket>,
+    passphrase_callback: Option<PassphraseCallback>,
+}
 
 /// Struct to build sockets.
 ///
@@ -57,15 +65,15 @@ pub struct SrtSocketBuilder(SocketOptions, Option<UdpSocket>);
 impl SrtSocketBuilder {
     /// Sets the local address of the socket. This can be used to bind to just a specific network adapter instead of the default of all adapters.
     pub fn local_ip(mut self, ip: IpAddr) -> Self {
-        let local = self.0.connect.local;
-        self.0.connect.local = SocketAddr::new(ip, local.port());
+        let local = self.options.connect.local;
+        self.options.connect.local = SocketAddr::new(ip, local.port());
         self
     }
 
     /// Sets the port to bind to. In general, to be used for [`Listen`] and [`Rendezvous`], but generally not [`Call`].
     pub fn local_port(mut self, port: u16) -> Self {
-        let local = self.0.connect.local;
-        self.0.connect.local = SocketAddr::new(local.ip(), port);
+        let local = self.options.connect.local;
+        self.options.connect.local = SocketAddr::new(local.ip(), port);
         self
     }
 
@@ -76,7 +84,7 @@ impl SrtSocketBuilder {
             .map_err(|_| OptionsError::InvalidLocalAddress)
             .unwrap();
 
-        self.0.connect.local = address
+        self.options.connect.local = address
             .try_into()
             .map_err(|_| OptionsError::InvalidLocalAddress)
             .unwrap();
@@ -88,8 +96,8 @@ impl SrtSocketBuilder {
     /// Set the latency of the connection. The more latency, the more time SRT has to recover lost packets.
     /// This sets both the send and receive latency
     pub fn latency(mut self, latency: Duration) -> Self {
-        self.0.sender.peer_latency = latency;
-        self.0.receiver.latency = latency;
+        self.options.sender.peer_latency = latency;
+        self.options.receiver.latency = latency;
 
         self
     }
@@ -99,30 +107,38 @@ impl SrtSocketBuilder {
     /// # Panics:
     /// * size is not 0, 16, 24, or 32.
     pub fn encryption(mut self, key_size: u16, passphrase: impl Into<String>) -> Self {
-        self.0.encryption.key_size = key_size.try_into().unwrap();
-        self.0.encryption.passphrase = Some(passphrase.into().try_into().unwrap());
+        self.options.encryption.key_size = key_size.try_into().unwrap();
+        self.options.encryption.passphrase = Some(passphrase.into().try_into().unwrap());
 
         self
     }
     /// the minimum latency to receive at
     pub fn receive_latency(mut self, latency: Duration) -> Self {
-        self.0.receiver.latency = latency;
+        self.options.receiver.latency = latency;
         self
     }
 
     /// the minimum latency to send at
     pub fn send_latency(mut self, latency: Duration) -> Self {
-        self.0.sender.peer_latency = latency;
+        self.options.sender.peer_latency = latency;
         self
     }
 
     pub fn bandwidth(mut self, bandwidth: LiveBandwidthMode) -> Self {
-        self.0.sender.bandwidth = bandwidth;
+        self.options.sender.bandwidth = bandwidth;
         self
     }
 
     pub fn socket(mut self, socket: UdpSocket) -> Self {
-        self.1 = Some(socket);
+        self.socket = Some(socket);
+        self
+    }
+
+    pub fn passphrase_callback(
+        mut self,
+        callback: impl Fn(Option<&str>, SocketAddr) -> PassphraseResult + Send + Sync + 'static,
+    ) -> Self {
+        self.passphrase_callback = Some(Arc::new(callback));
         self
     }
 
@@ -131,12 +147,12 @@ impl SrtSocketBuilder {
         SocketOptions: OptionsOf<O>,
         O: Validation<Error = OptionsError>,
     {
-        self.0.set_options(options);
+        self.options.set_options(options);
         self
     }
 
     pub fn set(mut self, set_fn: impl FnOnce(&mut SocketOptions)) -> Self {
-        set_fn(&mut self.0);
+        set_fn(&mut self.options);
         self
     }
 
@@ -148,11 +164,15 @@ impl SrtSocketBuilder {
     }
 
     pub async fn listen(self) -> Result<SrtSocket, io::Error> {
-        Self::bind(
-            ListenerOptions { socket: self.0 }.try_validate()?.into(),
-            self.1,
-        )
-        .await
+        let mut options = self.options;
+        if self.passphrase_callback.is_some() {
+            options.encryption.passphrase = None;
+        }
+        let options = ListenerOptions { socket: options }.try_validate()?;
+        match self.passphrase_callback {
+            Some(callback) => Self::bind_listen_with_callback(options, self.socket, callback).await,
+            None => Self::bind(options.into(), self.socket).await,
+        }
     }
 
     pub async fn call(
@@ -160,16 +180,16 @@ impl SrtSocketBuilder {
         remote: impl TryInto<SocketAddress>,
         stream_id: Option<&str>,
     ) -> Result<SrtSocket, io::Error> {
-        let options = CallerOptions::with(remote, stream_id, self.0)?;
-        Self::bind(options.into(), self.1).await
+        let options = CallerOptions::with(remote, stream_id, self.options)?;
+        Self::bind(options.into(), self.socket).await
     }
 
     pub async fn rendezvous(
         self,
         remote: impl TryInto<SocketAddress>,
     ) -> Result<SrtSocket, io::Error> {
-        let options = RendezvousOptions::with(remote, self.0)?;
-        Self::bind(options.into(), self.1).await
+        let options = RendezvousOptions::with(remote, self.options)?;
+        Self::bind(options.into(), self.socket).await
     }
 
     async fn bind(options: BindOptions, socket: Option<UdpSocket>) -> Result<SrtSocket, io::Error> {
@@ -177,5 +197,23 @@ impl SrtSocketBuilder {
             None => SrtSocket::bind(options).await,
             Some(socket) => SrtSocket::bind_with_socket(options, socket).await,
         }
+    }
+
+    async fn bind_listen_with_callback(
+        options: Valid<ListenerOptions>,
+        socket: Option<UdpSocket>,
+        passphrase_callback: PassphraseCallback,
+    ) -> Result<SrtSocket, io::Error> {
+        let socket = match socket {
+            None => bind_socket(&options.socket).await?,
+            Some(socket) => socket,
+        };
+        let socket = PacketSocket::from_socket(Arc::new(socket), 1024 * 1024);
+        let (socket, connection) =
+            super::listen::bind_with(socket, options, Some(passphrase_callback)).await?;
+
+        let (new_socket, new_state) = super::factory::split_new();
+        let (task, settings) = new_state.spawn_task(socket, connection);
+        Ok(new_socket.create_socket(settings, task))
     }
 }

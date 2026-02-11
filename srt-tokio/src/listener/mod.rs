@@ -8,7 +8,7 @@ use futures::{channel::mpsc, prelude::*};
 use srt_protocol::settings::ConnInitSettings;
 use tokio::{net::UdpSocket, sync::oneshot, task::JoinHandle};
 
-use crate::net::bind_socket;
+use crate::{net::bind_socket, PassphraseCallback};
 
 use super::{net::PacketSocket, options::*, watch};
 
@@ -35,13 +35,32 @@ impl SrtListener {
     }
 
     pub async fn bind(options: Valid<ListenerOptions>) -> Result<(Self, SrtIncoming), io::Error> {
-        let socket = bind_socket(&options.socket).await?;
-        Self::bind_with_socket(options, socket).await
+        Self::bind_with_callback(options, None, None).await
     }
 
     pub async fn bind_with_socket(
         options: Valid<ListenerOptions>,
         socket: UdpSocket,
+    ) -> Result<(Self, SrtIncoming), io::Error> {
+        Self::bind_with_socket_and_callback(options, socket, None).await
+    }
+
+    pub(crate) async fn bind_with_callback(
+        options: Valid<ListenerOptions>,
+        socket: Option<UdpSocket>,
+        passphrase_callback: Option<PassphraseCallback>,
+    ) -> Result<(Self, SrtIncoming), io::Error> {
+        let socket = match socket {
+            Some(socket) => socket,
+            None => bind_socket(&options.socket).await?,
+        };
+        Self::bind_with_socket_and_callback(options, socket, passphrase_callback).await
+    }
+
+    async fn bind_with_socket_and_callback(
+        options: Valid<ListenerOptions>,
+        socket: UdpSocket,
+        passphrase_callback: Option<PassphraseCallback>,
     ) -> Result<(Self, SrtIncoming), io::Error> {
         use state::SrtListenerState;
         let socket_options = options.into_value().socket;
@@ -57,6 +76,7 @@ impl SrtListener {
             settings.clone(),
             request_sender,
             statistics_sender,
+            passphrase_callback,
             close_resp,
         );
         let task = tokio::spawn(async move {

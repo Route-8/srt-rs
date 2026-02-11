@@ -83,7 +83,7 @@ impl SrtSocket {
 
         use BindOptions::*;
         let (socket, connection) = match options {
-            Listen(options) => listen::bind_with(socket, options).await?,
+            Listen(options) => listen::bind_with(socket, options, None).await?,
             Call(options) => call::bind_with(socket, options).await?,
             Rendezvous(options) => rendezvous::bind_with(socket, options).await?,
         };

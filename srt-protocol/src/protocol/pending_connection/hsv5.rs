@@ -94,7 +94,11 @@ pub fn gen_access_control_response(
                 CoreRejectReason::Unsecure.into(),
             ))
         }
-        (None, Some(_)) => unimplemented!("expected no secrets"),
+        (None, Some(_)) => {
+            return GenHsv5Result::Reject(ConnectionReject::Rejecting(
+                CoreRejectReason::Unsecure.into(),
+            ))
+        }
     };
 
     let outgoing_ext_km = cipher

@@ -1,13 +1,17 @@
-use std::{convert::TryInto, io, time::Duration};
+use std::{convert::TryInto, io, net::SocketAddr, sync::Arc, time::Duration};
 
 use tokio::net::UdpSocket;
 
-use crate::options::*;
+use crate::{options::*, PassphraseCallback, PassphraseResult};
 
 use super::{SrtIncoming, SrtListener};
 
 #[derive(Default)]
-pub struct SrtListenerBuilder(SocketOptions, Option<UdpSocket>);
+pub struct SrtListenerBuilder {
+    options: SocketOptions,
+    socket: Option<UdpSocket>,
+    passphrase_callback: Option<PassphraseCallback>,
+}
 
 /// Struct to build a multiplexed listener.
 ///
@@ -37,8 +41,8 @@ impl SrtListenerBuilder {
     /// Set the latency of the connection. The more latency, the more time SRT has to recover lost packets.
     /// This sets both the send and receive latency
     pub fn latency(mut self, latency: Duration) -> Self {
-        self.0.sender.peer_latency = latency;
-        self.0.receiver.latency = latency;
+        self.options.sender.peer_latency = latency;
+        self.options.receiver.latency = latency;
 
         self
     }
@@ -48,31 +52,39 @@ impl SrtListenerBuilder {
     /// # Panics:
     /// * size is not 0, 16, 24, or 32.
     pub fn encryption(mut self, key_size: u16, passphrase: impl Into<String>) -> Self {
-        self.0.encryption.key_size = key_size.try_into().unwrap();
-        self.0.encryption.passphrase = Some(passphrase.into().try_into().unwrap());
+        self.options.encryption.key_size = key_size.try_into().unwrap();
+        self.options.encryption.passphrase = Some(passphrase.into().try_into().unwrap());
 
         self
     }
 
     /// the minimum latency to receive at
     pub fn receive_latency(mut self, latency: Duration) -> Self {
-        self.0.receiver.latency = latency;
+        self.options.receiver.latency = latency;
         self
     }
 
     /// the minimum latency to send at
     pub fn send_latency(mut self, latency: Duration) -> Self {
-        self.0.sender.peer_latency = latency;
+        self.options.sender.peer_latency = latency;
         self
     }
 
     pub fn bandwidth(mut self, bandwidth: LiveBandwidthMode) -> Self {
-        self.0.sender.bandwidth = bandwidth;
+        self.options.sender.bandwidth = bandwidth;
         self
     }
 
     pub fn socket(mut self, socket: UdpSocket) -> Self {
-        self.1 = Some(socket);
+        self.socket = Some(socket);
+        self
+    }
+
+    pub fn passphrase_callback(
+        mut self,
+        callback: impl Fn(Option<&str>, SocketAddr) -> PassphraseResult + Send + Sync + 'static,
+    ) -> Self {
+        self.passphrase_callback = Some(Arc::new(callback));
         self
     }
 
@@ -81,12 +93,12 @@ impl SrtListenerBuilder {
         SocketOptions: OptionsOf<O>,
         O: Validation<Error = OptionsError>,
     {
-        self.0.set_options(options);
+        self.options.set_options(options);
         self
     }
 
     pub fn set(mut self, set_fn: impl FnOnce(&mut SocketOptions)) -> Self {
-        set_fn(&mut self.0);
+        set_fn(&mut self.options);
         self
     }
 
@@ -94,11 +106,12 @@ impl SrtListenerBuilder {
         self,
         local: impl TryInto<SocketAddress>,
     ) -> Result<(SrtListener, SrtIncoming), io::Error> {
-        let options = ListenerOptions::with(local, self.0)?;
-        match self.1 {
-            None => SrtListener::bind(options).await,
-            Some(socket) => SrtListener::bind_with_socket(options, socket).await,
+        let mut options = self.options;
+        if self.passphrase_callback.is_some() {
+            options.encryption.passphrase = None;
         }
+        let options = ListenerOptions::with(local, options)?;
+        SrtListener::bind_with_callback(options, self.socket, self.passphrase_callback).await
     }
 }
 

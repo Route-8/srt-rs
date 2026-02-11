@@ -1,14 +1,20 @@
 use std::{
     collections::HashMap,
+    convert::TryInto,
     net::SocketAddr,
     time::{Duration, Instant},
 };
 
 use futures::{channel::mpsc, future::Fuse, prelude::*, select, FutureExt, SinkExt};
-use srt_protocol::{connection::Connection, listener::*, packet::*, settings::ConnInitSettings};
+use srt_protocol::{
+    connection::Connection,
+    listener::*,
+    packet::{CoreRejectReason, *},
+    settings::{ConnInitSettings, KeySettings},
+};
 use tokio::sync::oneshot;
 
-use crate::{net::PacketSocket, watch};
+use crate::{net::PacketSocket, watch, PassphraseCallback, PassphraseResult};
 
 use super::session::*;
 
@@ -20,6 +26,7 @@ pub struct SrtListenerState {
     response_sender: mpsc::Sender<(SessionId, AccessControlResponse)>,
     response_receiver: mpsc::Receiver<(SessionId, AccessControlResponse)>,
     statistics_sender: watch::Sender<ListenerStatistics>,
+    passphrase_callback: Option<PassphraseCallback>,
     pending_connections: HashMap<SessionId, PendingConnection>,
     open_connections: HashMap<SessionId, OpenConnection>,
     close_recvr: Fuse<oneshot::Receiver<()>>,
@@ -32,6 +39,7 @@ impl SrtListenerState {
         settings: ConnInitSettings,
         request_sender: mpsc::Sender<ConnectionRequest>,
         statistics_sender: watch::Sender<ListenerStatistics>,
+        passphrase_callback: Option<PassphraseCallback>,
         close_recvr: oneshot::Receiver<()>,
     ) -> Self {
         let listener = MultiplexListener::new(Instant::now(), local_address, settings);
@@ -44,6 +52,7 @@ impl SrtListenerState {
             response_sender,
             response_receiver,
             statistics_sender,
+            passphrase_callback,
             pending_connections: Default::default(),
             open_connections: Default::default(),
             close_recvr: close_recvr.fuse(),
@@ -115,10 +124,56 @@ impl SrtListenerState {
         session_id: SessionId,
         request: AccessControlRequest,
     ) -> Result<(), ()> {
+        let resolved_key_settings = match &self.passphrase_callback {
+            Some(callback) => {
+                match callback(
+                    request.stream_id.as_ref().map(|s| s.as_str()),
+                    request.remote,
+                ) {
+                    PassphraseResult::Passphrase(passphrase) => match passphrase.try_into() {
+                        Ok(passphrase) => Some(Some(KeySettings {
+                            key_size: request.key_size,
+                            passphrase,
+                        })),
+                        Err(_) => {
+                            self.response_sender
+                                .send((
+                                    session_id,
+                                    AccessControlResponse::Rejected(
+                                        CoreRejectReason::BadSecret.into(),
+                                    ),
+                                ))
+                                .await
+                                .ok()
+                                .ok_or(())?;
+                            return Ok(());
+                        }
+                    },
+                    PassphraseResult::None => Some(None),
+                    PassphraseResult::Unauthorized => {
+                        self.response_sender
+                            .send((
+                                session_id,
+                                AccessControlResponse::Rejected(CoreRejectReason::BadSecret.into()),
+                            ))
+                            .await
+                            .ok()
+                            .ok_or(())?;
+                        return Ok(());
+                    }
+                }
+            }
+            None => None,
+        };
+
         let request_sender = &mut self.request_sender;
         let response_sender = self.response_sender.clone();
-        let (pending, request) =
-            PendingConnection::start_approval(session_id, request, response_sender);
+        let (pending, request) = PendingConnection::start_approval(
+            session_id,
+            request,
+            response_sender,
+            resolved_key_settings.flatten(),
+        );
         request_sender.send(request).await.ok().ok_or(())?;
         let _ = self.pending_connections.insert(session_id, pending);
         Ok(())

@@ -23,6 +23,7 @@ use crate::{
 pub struct ConnectionRequest {
     response_sender: ResponseSender,
     request: AccessControlRequest,
+    resolved_key_settings: Option<KeySettings>,
     settings_receiver: oneshot::Receiver<(ConnectionSettings, JoinHandle<()>)>,
     socket_factory: SrtSocketFactory,
 }
@@ -48,6 +49,7 @@ impl ConnectionRequest {
         self,
         key_settings: Option<KeySettings>,
     ) -> Result<SrtSocket, std::io::Error> {
+        let key_settings = key_settings.or(self.resolved_key_settings);
         self.response_sender
             .send(AccessControlResponse::Accepted(key_settings))
             .await?;
@@ -78,6 +80,7 @@ impl PendingConnection {
         session_id: SessionId,
         request: AccessControlRequest,
         response_sender: mpsc::Sender<(SessionId, AccessControlResponse)>,
+        resolved_key_settings: Option<KeySettings>,
     ) -> (PendingConnection, ConnectionRequest) {
         let (socket_factory, task_factory) = factory::split_new();
 
@@ -92,6 +95,7 @@ impl PendingConnection {
         let request = ConnectionRequest {
             request,
             response_sender,
+            resolved_key_settings,
             settings_receiver,
             socket_factory,
         };

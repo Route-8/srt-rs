@@ -47,6 +47,8 @@
 //! ```
 //!
 
+use std::{net::SocketAddr, sync::Arc};
+
 mod listener;
 mod net;
 mod socket;
@@ -60,3 +62,16 @@ pub use crate::{
     listener::{ConnectionRequest, ListenerStatistics, SrtIncoming, SrtListener},
     socket::{SocketStatistics, SrtSocket, SrtSocketBuilder},
 };
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PassphraseResult {
+    /// Use this passphrase for encryption.
+    Passphrase(String),
+    /// Accept without encryption.
+    None,
+    /// Reject this connection.
+    Unauthorized,
+}
+
+pub type PassphraseCallback =
+    Arc<dyn Fn(Option<&str>, SocketAddr) -> PassphraseResult + Send + Sync>;
