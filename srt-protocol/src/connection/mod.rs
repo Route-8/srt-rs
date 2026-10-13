@@ -173,6 +173,7 @@ impl DuplexConnection {
         self.stats.tx_buffered_bytes = self.sender.tx_buffered_bytes();
 
         self.stats.rx_acknowledged_time = self.receiver.rx_acknowledged_time();
+        self.stats.rx_average_rtt = self.receiver.arq.rtt_mean();
     }
 
     pub fn next_packet(&mut self, now: Instant) -> Option<(Packet, SocketAddr)> {

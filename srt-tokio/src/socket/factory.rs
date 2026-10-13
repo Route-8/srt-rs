@@ -41,6 +41,7 @@ impl SrtSocketState {
         let statistics_sender = self.statistics_sender;
         while connection.is_open() {
             if connection.should_update_statistics(Instant::now()) {
+                connection.update_statistics(Instant::now());
                 let _ = statistics_sender.send(connection.statistics().clone());
             }
 

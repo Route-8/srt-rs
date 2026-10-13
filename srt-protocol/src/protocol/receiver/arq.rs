@@ -200,6 +200,11 @@ impl AutomaticRepeatRequestAlgorithm {
                 .is_finished(self.receive_buffer.next_ack_dsn())
     }
 
+    /// Smoothed receiver-side RTT (EWMA over ACK/ACKACK pairs).
+    pub fn rtt_mean(&self) -> Duration {
+        self.rtt.mean_as_duration()
+    }
+
     pub fn unacked_packet_count(&self) -> u32 {
         self.ack_history_window
             .unacked_packet_count(self.receive_buffer.next_ack_dsn())
