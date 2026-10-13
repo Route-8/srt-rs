@@ -2,9 +2,8 @@
 use std::{
     env,
     ffi::{CStr, CString},
-    intrinsics::transmute,
     io::ErrorKind,
-    mem::size_of,
+    mem::{size_of, transmute},
     net::{SocketAddr, SocketAddrV4},
     os::raw::{c_char, c_int},
     process::Command,

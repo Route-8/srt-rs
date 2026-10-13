@@ -125,7 +125,7 @@ mod tests {
 
     use anyhow::Result;
     use bytes::Bytes;
-    use futures::{channel::oneshot, future::join_all, prelude::*};
+    use futures::{channel::oneshot, future::join_all};
     use log::{debug, info};
 
     use crate::{access::*, SrtSocket};

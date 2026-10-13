@@ -76,7 +76,7 @@ mod timebase {
             // adjust the test instant time enough so that
             // 1) underflow and overflow are avoided
             // 2) TimeStamp rollover is covered
-            let adjustment = ((std::u32::MAX as u64 + 1) as i64) * (n as i64);
+            let adjustment = ((u32::MAX as u64 + 1) as i64) * (n as i64);
             let instant = if adjustment > 0 {
                 now + Duration::from_micros(adjustment as u64) + expected_offset
             } else {

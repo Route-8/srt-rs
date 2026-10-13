@@ -294,14 +294,14 @@ fn le_bytes_to_string(le_bytes: &mut impl Buf) -> Result<String, PacketParseErro
 }
 
 fn string_to_le_bytes(str: &str, into: &mut impl BufMut) {
-    let mut chunks = str.as_bytes().chunks_exact(4);
+    let (chunks, remainder) = str.as_bytes().as_chunks::<4>();
 
-    while let Some(&[a, b, c, d]) = chunks.next() {
+    for &[a, b, c, d] in chunks {
         into.put(&[d, c, b, a][..]);
     }
 
     // add padding bytes for the final word if needed
-    match *chunks.remainder() {
+    match *remainder {
         [a, b, c] => into.put(&[0, c, b, a][..]),
         [a, b] => into.put(&[0, 0, b, a][..]),
         [a] => into.put(&[0, 0, 0, a][..]),

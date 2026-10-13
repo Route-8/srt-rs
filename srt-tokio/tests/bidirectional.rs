@@ -15,7 +15,7 @@ async fn bidirectional() {
     let b = SrtSocket::bind(ListenerOptions::new(":5000").unwrap().into());
 
     let mut join_handles = vec![];
-    for fut in vec![a, b] {
+    for fut in [a, b] {
         join_handles.push(spawn(async move {
             let side = fut.await.unwrap();
             let (mut s, mut r) = side.split();

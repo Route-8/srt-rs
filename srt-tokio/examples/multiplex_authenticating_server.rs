@@ -39,13 +39,10 @@ async fn handle_request(request: ConnectionRequest) {
         passphrase: Passphrase::from("password128"),
     };
     let mut sender = request.accept(Some(key_settings)).await.unwrap();
-    let mut stream = stream::iter(
-        Some(Ok((
-            Instant::now(),
-            Bytes::from("Hello authenticated user!!"),
-        )))
-        .into_iter(),
-    );
+    let mut stream = stream::iter(Some(Ok((
+        Instant::now(),
+        Bytes::from("Hello authenticated user!!"),
+    ))));
 
     sender.send_all(&mut stream).await.unwrap();
     sender.close().await.unwrap();
