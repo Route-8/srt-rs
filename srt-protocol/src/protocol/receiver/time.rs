@@ -57,6 +57,9 @@ impl SynchronizedRemoteClock {
 
                 self.stats = Some(OnlineStats::new());
                 if stddev > self.drift_deviation_tolerance {
+                    // slide the reference forward without correcting drift, otherwise
+                    // instant_from wraps once ts is more than 2^31 µs past reference_ts
+                    self.time_base.adjust(now, TimeSpan::ZERO);
                     return None;
                 }
 
@@ -138,6 +141,26 @@ mod synchronized_remote_clock {
                 let instant = clock.instant_from(now_ts);
                 prop_assert_eq!(instant, now, "the clock should not be adjusted: tick_ts = {}", tick_ts);
             }
+        }
+    }
+
+    #[test]
+    fn jittery_drift_does_not_wrap_after_2_pow_31_micros() {
+        let start = Instant::now() + TimeSpan::MAX;
+        let start_ts = TimeStamp::from_micros(100_000_000);
+        let mut clock = SynchronizedRemoteClock::new(start);
+        clock.synchronize(start, start_ts);
+
+        // 1s per sample, +/-11ms jitter fails the 5ms gate every window; 3000s > 2^31 µs
+        let mut now_ts = start_ts;
+        for tick in 1..3000 {
+            let now = start + Duration::from_secs(tick as u64);
+            now_ts = now_ts + TimeSpan::from_millis(1_000);
+            let jitter = TimeSpan::from_micros((tick % 2) * 11_000);
+            assert_eq!(clock.synchronize(now, now_ts - jitter), None);
+
+            let instant = clock.monotonic_instant_from(now_ts);
+            assert!(instant + Duration::from_millis(20) >= now, "tick = {tick}");
         }
     }
 
